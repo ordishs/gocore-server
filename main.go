@@ -69,6 +69,23 @@ func postHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Created"))
 }
 
+func deleteHandler(w http.ResponseWriter, r *http.Request) {
+
+	vars := mux.Vars(r)
+	host := vars["host"]
+	address := vars["address"]
+	serviceName := vars["serviceName"]
+	key := fmt.Sprintf("%s:%s:%s", host, address, serviceName)
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	delete(services, key)
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Deleted"))
+}
+
 func getHandler(w http.ResponseWriter, r *http.Request) {
 	mu.RLock()
 	defer mu.RUnlock()
@@ -145,8 +162,10 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/gocore", getHandler).Methods("GET")
 	r.HandleFunc("/gocore", postHandler).Methods("POST")
+	r.HandleFunc("/gocore/{host}/{address}/{serviceName}", deleteHandler).Methods("DELETE")
 
-	corsObj := handlers.AllowedOrigins([]string{"*"})
+	originsOk := handlers.AllowedOrigins([]string{"*"})
+	methodsOk := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "DELETE", "OPTIONS"})
 
-	log.Fatal(http.ListenAndServe(":8888", handlers.CORS(corsObj)(r)))
+	log.Fatal(http.ListenAndServe(":8889", handlers.CORS(originsOk, methodsOk)(r)))
 }
