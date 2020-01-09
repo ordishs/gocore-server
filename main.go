@@ -164,6 +164,8 @@ func main() {
 	r.HandleFunc("/gocore", postHandler).Methods("POST")
 	r.HandleFunc("/gocore/{host}/{address}/{serviceName}", deleteHandler).Methods("DELETE")
 
+	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./static/")))
+
 	originsOk := handlers.AllowedOrigins([]string{"*"})
 	methodsOk := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "DELETE", "OPTIONS"})
 
