@@ -160,9 +160,9 @@ func getHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	r := mux.NewRouter()
-	r.HandleFunc("/gocore", getHandler).Methods("GET")
-	r.HandleFunc("/gocore", postHandler).Methods("POST")
-	r.HandleFunc("/gocore/{host}/{address}/{serviceName}", deleteHandler).Methods("DELETE")
+	r.HandleFunc("/api", getHandler).Methods("GET")
+	r.HandleFunc("/api", postHandler).Methods("POST")
+	r.HandleFunc("/api/{host}/{address}/{serviceName}", deleteHandler).Methods("DELETE")
 
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./static/")))
 
