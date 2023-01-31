@@ -57,27 +57,17 @@ else
 fi
 
 
-mkdir -p build/linux/$FILENAME
-mkdir -p build/dist
-
-
 # Linux
-env GOOS=linux GOARCH=amd64 go build --trimpath -o build/linux/$FILENAME/${PROG_NAME} -ldflags="-s -w -X main.commit=${GIT_COMMIT}"
-cp assets/linux/start.sh assets/linux/stop.sh build/linux/$FILENAME
-cd build/linux
-tar cvfz ../dist/${PROG_NAME}-linux.tar.gz ./$FILENAME
-cd ../.. 
+env GOOS=linux GOARCH=amd64 go build --trimpath -o build/linux/$FILENAME -ldflags="-s -w -X main.commit=${GIT_COMMIT} -X main.version=MANUAL"
 
 if [[ "$?" == "0" ]]; then
   echo $GIT_COMMIT > build/commit.dat
   echo "${PROG_NAME}: Built $FILENAME"
 
-  cp assets/index.html ./build/dist
-  cp -r assets/media ./build/dist
-
-  cd build/dist
-  tar cvfz ../../$FILENAME.tar.gz ./*
-  
+  cp settings_local.conf build/linux/
+  cp -r assets build/linux/
+  cd build/linux/
+  tar cvfz ../../$FILENAME.tar.gz *  
   echo "${PROG_NAME}: Artifact $FILENAME.tar.gz"
 else
   echo "${PROG_NAME}: Build FAILED"
