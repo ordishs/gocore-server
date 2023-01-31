@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"gocore_server/webapp"
 	"log"
 	"net/http"
 	"sort"
@@ -12,6 +13,13 @@ import (
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
+
+// Name used by build script for the binaries. (Please keep on single line)
+const progname = "gocore_server"
+
+// Version & commit strings injected at build with -ldflags -X...
+var version string
+var commit string
 
 var (
 	mu       sync.RWMutex
@@ -164,7 +172,7 @@ func main() {
 	r.HandleFunc("/api", postHandler).Methods("POST")
 	r.HandleFunc("/api/{host}/{address}/{serviceName}", deleteHandler).Methods("DELETE")
 
-	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./static/")))
+	r.PathPrefix("/").HandlerFunc(webapp.AppHandler).Methods("GET")
 
 	originsOk := handlers.AllowedOrigins([]string{"*"})
 	methodsOk := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "DELETE", "OPTIONS"})
