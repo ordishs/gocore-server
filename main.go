@@ -15,7 +15,7 @@ import (
 )
 
 // Name used by build script for the binaries. (Please keep on single line)
-const progname = "gocore_server"
+const progname = "gocore-server"
 
 // Version & commit strings injected at build with -ldflags -X...
 var version string

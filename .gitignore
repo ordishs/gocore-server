@@ -13,3 +13,5 @@
 
 .history
 build
+
+*.tar.gz
