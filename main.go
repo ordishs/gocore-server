@@ -1,17 +1,16 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"gocore_server/webapp"
-	"log"
 	"net/http"
-	"sort"
-	"sync"
-	"time"
+	"os"
+	"os/signal"
+
+	"gocore_server/server"
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"github.com/ordishs/gocore"
 )
 
 // Name used by build script for the binaries. (Please keep on single line)
@@ -21,161 +20,56 @@ const progname = "gocore-server"
 var version string
 var commit string
 
-var (
-	mu       sync.RWMutex
-	services map[string]interface{}
-)
+var logger = gocore.Log(progname)
 
 func init() {
-	services = make(map[string]interface{})
-}
-
-func postHandler(w http.ResponseWriter, r *http.Request) {
-	mu.Lock()
-	defer mu.Unlock()
-
-	decoder := json.NewDecoder(r.Body)
-	var j interface{}
-
-	decoder.Decode(&j)
-
-	jmap, ok := j.(map[string]interface{})
-	if !ok {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("BAD"))
-		return
-	}
-
-	host, ok := jmap["host"].(string)
-	if !ok {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("No host"))
-		return
-	}
-
-	address, ok := jmap["address"].(string)
-	if !ok {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("NO address"))
-		return
-	}
-
-	serviceName, ok := jmap["serviceName"].(string)
-	if !ok {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("NO serviceName"))
-		return
-	}
-
-	key := fmt.Sprintf("%s:%s:%s", host, address, serviceName)
-
-	jmap["_ts"] = time.Now().UTC().Format(time.RFC3339)
-
-	services[key] = j
-
-	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte("Created"))
-}
-
-func deleteHandler(w http.ResponseWriter, r *http.Request) {
-
-	vars := mux.Vars(r)
-	host := vars["host"]
-	address := vars["address"]
-	serviceName := vars["serviceName"]
-	key := fmt.Sprintf("%s:%s:%s", host, address, serviceName)
-
-	mu.Lock()
-	defer mu.Unlock()
-
-	delete(services, key)
-
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Deleted"))
-}
-
-func getHandler(w http.ResponseWriter, r *http.Request) {
-	mu.RLock()
-	defer mu.RUnlock()
-
-	values := make([]interface{}, 0)
-	for _, v := range services {
-		values = append(values, v)
-	}
-
-	encoder := json.NewEncoder(w)
-
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-
-	sort.SliceStable(values, func(i, j int) bool {
-		imap, ok := values[i].(map[string]interface{})
-		if !ok {
-			return i < j
-		}
-		jmap, ok := values[j].(map[string]interface{})
-		if !ok {
-			return i < j
-		}
-
-		iService, ok := imap["serviceName"].(string)
-		if !ok {
-			return i < j
-		}
-
-		jService, ok := jmap["serviceName"].(string)
-		if !ok {
-			return i < j
-		}
-
-		if iService != jService {
-			return iService < jService
-		}
-
-		iHost, ok := imap["host"].(string)
-		if !ok {
-			return i < j
-		}
-
-		jHost, ok := jmap["host"].(string)
-		if !ok {
-			return i < j
-		}
-
-		if iHost != jHost {
-			return iHost < jHost
-		}
-
-		iPort, ok := imap["port"].(float64)
-		if !ok {
-			return i < j
-		}
-
-		jPort, ok := jmap["port"].(float64)
-		if !ok {
-			return i < j
-		}
-
-		if iPort != jPort {
-			return iPort < jPort
-		}
-
-		return i < j
-	})
-
-	encoder.Encode(&values)
+	gocore.SetInfo(progname, version, commit)
 }
 
 func main() {
+	stats := gocore.Config().Stats()
+	logger.Infof("STATS\n%s\nVERSION\n-------\n%s (%s)\n\n", stats, version, commit)
+
+	go func() {
+		profilerAddr, ok := gocore.Config().Get("accountManager_profilerAddr")
+		if ok {
+			logger.Infof("Starting profile on http://%s/debug/pprof", profilerAddr)
+			logger.Fatalf("%v", http.ListenAndServe(profilerAddr, nil))
+		}
+	}()
+
+	// setup signal catching
+	signalChan := make(chan os.Signal, 1)
+
+	signal.Notify(signalChan, os.Interrupt)
+
+	go func() {
+		<-signalChan
+
+		appCleanup()
+		os.Exit(1)
+	}()
+
+	start()
+}
+
+func appCleanup() {
+	logger.Infof("Shutting down...")
+}
+
+func start() {
 	r := mux.NewRouter()
-	r.HandleFunc("/api", getHandler).Methods("GET")
-	r.HandleFunc("/api", postHandler).Methods("POST")
-	r.HandleFunc("/api/{host}/{address}/{serviceName}", deleteHandler).Methods("DELETE")
+	r.HandleFunc("/api", server.GetHandler).Methods("GET")
+	r.HandleFunc("/api", server.PostHandler).Methods("POST")
+	r.HandleFunc("/api/{host}/{address}/{serviceName}", server.DeleteHandler).Methods("DELETE")
 
 	r.PathPrefix("/").HandlerFunc(webapp.AppHandler).Methods("GET")
 
 	originsOk := handlers.AllowedOrigins([]string{"*"})
 	methodsOk := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "DELETE", "OPTIONS"})
 
-	log.Fatal(http.ListenAndServe(":8889", handlers.CORS(originsOk, methodsOk)(r)))
+	address, _ := gocore.Config().Get("address", ":8889")
+
+	logger.Infof("Starting server on %s", address)
+	logger.Fatal(http.ListenAndServe(address, handlers.CORS(originsOk, methodsOk)(r)))
 }

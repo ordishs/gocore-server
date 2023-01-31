@@ -35,7 +35,7 @@ func AppHandler(w http.ResponseWriter, r *http.Request) {
 			b, err = res.ReadFile(resource)
 			if err != nil {
 				w.WriteHeader(http.StatusNotFound)
-				w.Write([]byte("Not found"))
+				_, _ = w.Write([]byte("Not found"))
 				return
 			}
 		}
