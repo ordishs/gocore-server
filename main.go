@@ -71,5 +71,13 @@ func start() {
 	address, _ := gocore.Config().Get("address", ":8889")
 
 	logger.Infof("Starting server on %s", address)
-	logger.Fatal(http.ListenAndServe(address, handlers.CORS(originsOk, methodsOk)(r)))
+
+	certFile, _ := gocore.Config().Get("certFile")
+	keyFile, _ := gocore.Config().Get("keyFile")
+
+	if certFile != "" && keyFile != "" {
+		logger.Fatal(http.ListenAndServeTLS(address, certFile, keyFile, handlers.CORS(originsOk, methodsOk)(r)))
+	} else {
+		logger.Fatal(http.ListenAndServe(address, handlers.CORS(originsOk, methodsOk)(r)))
+	}
 }
